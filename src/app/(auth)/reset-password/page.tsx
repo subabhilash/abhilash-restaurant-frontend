@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -28,7 +28,20 @@ const schema = z
 
 type FormData = z.infer<typeof schema>;
 
+// Wrapper component — useSearchParams() requires a Suspense boundary in Next.js 15
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
