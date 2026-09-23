@@ -1,7 +1,9 @@
 "use client";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, CreditCard } from "lucide-react";
 import { useOrder, useUpdateOrderStatus, useUpdatePaymentStatus } from "@/hooks/use-orders";
+import { billingService } from "@/services/billing.service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +30,14 @@ const PAYMENT_OPTIONS = [
   { value: "refunded",       label: "Refunded" },
 ];
 
+interface BillSummary {
+  id: number;
+  bill_number: string;
+  status: string;
+  total_amount: number;
+  paid_amount: number;
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between py-1.5 text-sm border-b last:border-0">
@@ -43,6 +53,8 @@ export default function OrderDetailPage() {
   const { data: order, isLoading } = useOrder(parseInt(id));
   const updateStatus = useUpdateOrderStatus();
   const updatePayment = useUpdatePaymentStatus();
+  const [bill, setBill] = useState<BillSummary | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
 
   async function advance(status: OrderStatus) {
     try { await updateStatus.mutateAsync({ id: parseInt(id), status }); toast.success(`Order marked as ${status}`); }
@@ -58,6 +70,36 @@ export default function OrderDetailPage() {
   async function changePayment(payment_status: string) {
     try { await updatePayment.mutateAsync({ id: parseInt(id), payment_status }); toast.success(`Payment: ${payment_status.replace("_", " ")}`); }
     catch { toast.error("Failed to update payment"); }
+  }
+
+  async function generateBill() {
+    setBillingLoading(true);
+    try {
+      const created = await billingService.createBill(parseInt(id));
+      setBill(created);
+      toast.success(`Bill ${created.bill_number} ready`);
+    } catch {
+      toast.error("Failed to generate bill");
+    } finally {
+      setBillingLoading(false);
+    }
+  }
+
+  async function markBillPaid() {
+    if (!bill) return;
+    const due = Math.max(0, bill.total_amount - bill.paid_amount);
+    if (due <= 0) return;
+    setBillingLoading(true);
+    try {
+      const paid = await billingService.addPayment(bill.id, { amount: due });
+      setBill(paid);
+      await updatePayment.mutateAsync({ id: parseInt(id), payment_status: "paid" });
+      toast.success("Bill paid");
+    } catch {
+      toast.error("Failed to record payment");
+    } finally {
+      setBillingLoading(false);
+    }
   }
 
   if (isLoading) return <div className="space-y-4"><Skeleton className="h-9 w-64" /><Skeleton className="h-64 w-full" /></div>;
@@ -116,6 +158,22 @@ export default function OrderDetailPage() {
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>{PAYMENT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
             </Select>
+          </div>
+          <div className="mt-4 flex items-center justify-between rounded-lg border bg-gray-50 p-3">
+            <div>
+              <p className="text-sm font-medium">{bill ? `Bill ${bill.bill_number}` : "No bill generated"}</p>
+              <p className="text-xs text-muted-foreground">
+                {bill ? `${bill.status} · ${formatCurrency(bill.paid_amount)} paid of ${formatCurrency(bill.total_amount)}` : "Generate bill from this order"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={generateBill} disabled={billingLoading}>
+                {bill ? "Refresh Bill" : "Generate Bill"}
+              </Button>
+              {bill && bill.status !== "paid" && (
+                <Button size="sm" onClick={markBillPaid} disabled={billingLoading}>Mark Paid</Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

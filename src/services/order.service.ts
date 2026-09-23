@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/axios";
-import type { Order, OrderListItem, Table } from "@/types/order.types";
+import type { Order, OrderListItem, Table, TableQRCode } from "@/types/order.types";
 import type { PaginatedResponse } from "@/types/api.types";
 
 export const orderService = {
@@ -22,6 +22,14 @@ export const orderService = {
     apiClient.delete(`/orders/tables/${id}`).then((r) => r.data),
   rotateQR: (id: number) =>
     apiClient.post<Table>(`/orders/tables/${id}/rotate-qr`).then((r) => r.data),
+  listQRCodes: (tableId: number) =>
+    apiClient.get<TableQRCode[]>(`/orders/tables/${tableId}/qr-codes`).then((r) => r.data),
+  createQRCode: (tableId: number) =>
+    apiClient.post<TableQRCode>(`/orders/tables/${tableId}/qr-codes`).then((r) => r.data),
+  rotateQRCode: (qrId: string) =>
+    apiClient.patch<TableQRCode>(`/orders/qr-codes/${qrId}/rotate`).then((r) => r.data),
+  disableQRCode: (qrId: string) =>
+    apiClient.patch<TableQRCode>(`/orders/qr-codes/${qrId}/disable`).then((r) => r.data),
 
   publicCreate: (slug: string, qrToken: string, data: object) =>
     apiClient.post(`/orders/public/${slug}/${qrToken}`, data).then((r) => r.data),

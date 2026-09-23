@@ -23,6 +23,23 @@ export interface Table {
   created_at: string;
 }
 
+export interface TableQRCode {
+  id: number;
+  restaurant_id: number;
+  table_id: number;
+  qr_id: string;
+  qr_token: string;
+  qr_url: string;
+  status: "active" | "disabled" | "rotated" | "expired";
+  created_by: number | null;
+  created_by_role: string;
+  rotated_at: string | null;
+  last_scanned_at: string | null;
+  scan_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OrderItem {
   id: number;
   menu_item_id: number;

@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ShoppingCart, Plus, Minus, X, Loader2 } from "lucide-react";
 import { usePublicMenu } from "@/hooks/use-menu";
 import { orderService } from "@/services/order.service";
+import { waiterService } from "@/services/waiter.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,7 @@ export default function PublicOrderPage() {
   const [activeCat, setActiveCat] = useState<number>(0);
   const [showCart, setShowCart] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [callingWaiter, setCallingWaiter] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
 
@@ -72,16 +74,33 @@ export default function PublicOrderPage() {
     finally { setPlacing(false); }
   }
 
+  async function callWaiter() {
+    setCallingWaiter(true);
+    try {
+      await waiterService.publicCall(slug, qrToken);
+      toast.success("Waiter called");
+    } catch {
+      toast.error("Failed to call waiter");
+    } finally {
+      setCallingWaiter(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div><h1 className="font-bold text-lg">{data.restaurant.name}</h1><p className="text-xs text-muted-foreground">Tap items to order</p></div>
-          <button onClick={() => setShowCart(true)} className="relative flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-white font-medium text-sm">
-            <ShoppingCart className="h-4 w-4" />
-            {itemCount > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold">{itemCount}</span>}
-            {formatCurrency(total, data.restaurant.currency)}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={callWaiter} disabled={callingWaiter} className="rounded-xl border px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50">
+              {callingWaiter ? "Calling…" : "Call Waiter"}
+            </button>
+            <button onClick={() => setShowCart(true)} className="relative flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-white font-medium text-sm">
+              <ShoppingCart className="h-4 w-4" />
+              {itemCount > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold">{itemCount}</span>}
+              {formatCurrency(total, data.restaurant.currency)}
+            </button>
+          </div>
         </div>
         <div className="max-w-lg mx-auto px-4 pb-2 flex gap-2 overflow-x-auto">
           {categories.map((cat) => (

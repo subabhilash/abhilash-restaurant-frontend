@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Table2, ShoppingCart, CheckCircle2, Clock, LogOut,
   Plus, RefreshCw, AlertCircle,
 } from "lucide-react";
 import { useOrders, useUpdateOrderStatus, useTables } from "@/hooks/use-orders";
+import { waiterService } from "@/services/waiter.service";
 import { useAuthStore } from "@/store/auth.store";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,18 @@ export default function WaiterPage() {
 
   const { data: ordersData, isLoading: ordersLoading, refetch } = useOrders({ page_size: "100" });
   const { data: tablesData, isLoading: tablesLoading } = useTables();
+  const { data: callsData } = useQuery({
+    queryKey: ["waiter-calls", "open"],
+    queryFn: () => waiterService.listCalls({ call_status: "open", page_size: "20" }),
+    refetchInterval: 30000,
+  });
+  const resolveCall = useMutation({
+    mutationFn: (id: number) => waiterService.updateCall(id, { status: "resolved" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["waiter-calls"] });
+      toast.success("Call resolved");
+    },
+  });
 
   const allOrders = ordersData?.results ?? [];
   const tables = (tablesData?.results ?? []).filter((t) => t.is_active);
@@ -118,6 +131,7 @@ export default function WaiterPage() {
   const readyCount = allOrders.filter((o) => o.status === "ready").length;
   const pendingCount = allOrders.filter((o) => o.status === "pending").length;
   const activeCount = allOrders.filter((o) => ACTIVE_STATUSES.includes(o.status)).length;
+  const calls = callsData?.results ?? [];
 
   // Real-time updates
   useEffect(() => {
@@ -200,6 +214,28 @@ export default function WaiterPage() {
             </CardContent>
           </Card>
         </div>
+
+        {calls.length > 0 && (
+          <Card className="border-blue-300 bg-blue-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Waiter Calls</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {calls.map((call: { id: number; table_id: number; reason: string; created_at: string }) => {
+                const table = tables.find((t) => t.id === call.table_id);
+                return (
+                  <div key={call.id} className="flex items-center justify-between rounded-lg bg-white border p-2">
+                    <div>
+                      <p className="text-sm font-semibold">Table {table?.table_number ?? call.table_id}</p>
+                      <p className="text-xs text-muted-foreground">{call.reason} · {timeAgo(call.created_at)}</p>
+                    </div>
+                    <Button size="sm" onClick={() => resolveCall.mutate(call.id)} disabled={resolveCall.isPending}>Resolve</Button>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Alerts for ready orders */}
         {readyCount > 0 && (

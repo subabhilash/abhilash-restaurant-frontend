@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
-import { Plus, QrCode, RotateCcw, PowerOff, Copy, ExternalLink } from "lucide-react";
+import { useRef, useState } from "react";
+import { QRCodeCanvas } from "qrcode.react";
+import { Plus, QrCode, RotateCcw, PowerOff, Copy, ExternalLink, Download } from "lucide-react";
 import { useTables, useCreateTable, useDeactivateTable, useRotateQR } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -70,26 +71,45 @@ export default function TablesPage() {
       {showCreate && <CreateTableDialog onClose={() => setShowCreate(false)} />}
 
       {qrTable && (
-        <Dialog open onOpenChange={() => setQrTable(null)}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>QR Code — Table {qrTable.table_number}</DialogTitle></DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-2">
-              <img
-                src={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") ?? "http://127.0.0.1:8099"}/api/v1/orders/tables/${qrTable.id}/qr-image`}
-                alt={`QR for Table ${qrTable.table_number}`}
-                className="h-48 w-48 rounded-xl border p-2 bg-white shadow-sm"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-              <div className="w-full rounded-lg bg-muted p-3"><p className="text-xs text-muted-foreground mb-1">Customer URL</p><p className="text-xs font-mono break-all">{qrTable.qr_url}</p></div>
-              <div className="flex gap-2 w-full">
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => { navigator.clipboard.writeText(qrTable.qr_url); toast.success("Copied!"); }}><Copy className="h-4 w-4" />Copy URL</Button>
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(qrTable.qr_url, "_blank")}><ExternalLink className="h-4 w-4" />Open</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <QRCodeDialog table={qrTable} onClose={() => setQrTable(null)} />
       )}
     </div>
+  );
+}
+
+function QRCodeDialog({ table, onClose }: { table: Table; onClose: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  function downloadQR() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `table-${table.table_number}-qr.png`;
+    link.click();
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>QR Code — Table {table.table_number}</DialogTitle></DialogHeader>
+        <div className="flex flex-col items-center gap-4 py-2">
+          <div className="rounded-xl border bg-white p-3 shadow-sm">
+            <QRCodeCanvas ref={canvasRef} value={table.qr_url} size={192} level="M" includeMargin />
+          </div>
+          <div className="w-full rounded-lg bg-muted p-3">
+            <p className="text-xs text-muted-foreground mb-1">Customer URL</p>
+            <p className="text-xs font-mono break-all">{table.qr_url}</p>
+          </div>
+          <div className="grid w-full grid-cols-3 gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => { navigator.clipboard.writeText(table.qr_url); toast.success("Copied!"); }}><Copy className="h-4 w-4" />Copy</Button>
+            <Button variant="outline" className="gap-2" onClick={() => window.open(table.qr_url, "_blank")}><ExternalLink className="h-4 w-4" />Open</Button>
+            <Button variant="outline" className="gap-2" onClick={downloadQR}><Download className="h-4 w-4" />PNG</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
